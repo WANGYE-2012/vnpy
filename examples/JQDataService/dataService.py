@@ -87,7 +87,7 @@ def downMinuteBarBySymbol(symbol, num):
         bar = generateVtBar(symbol,ix,row)
         bars.append(bar)
 
-    database_manager.save_bar_data(bars)
+    database_manager.save_bar_data(bars, symbol)
 
     end = ti.time()
     cost = (end - start) * 1000

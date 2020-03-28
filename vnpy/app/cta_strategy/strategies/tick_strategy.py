@@ -45,17 +45,17 @@ class TickStrategy(CtaTemplate):
         """
         self.write_log("策略启动")
         # 范围时间
-        d_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '8:55', '%Y-%m-%d%H:%M')
-        d_time1 = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '20:59', '%Y-%m-%d%H:%M')
-
-        # 当前时间
-        n_time = datetime.datetime.now()
-
-        # 判断当前时间是否在范围时间内
-        if n_time > d_time and n_time < d_time1:
-            if self.day_open:
-                self.buy(self.day_open * 1.04, 1)
-                print(self.day_open)
+        # d_time = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '8:55', '%Y-%m-%d%H:%M')
+        # d_time1 = datetime.datetime.strptime(str(datetime.datetime.now().date()) + '20:59', '%Y-%m-%d%H:%M')
+        #
+        # # 当前时间
+        # n_time = datetime.datetime.now()
+        #
+        # # 判断当前时间是否在范围时间内
+        # if n_time > d_time and n_time < d_time1:
+        #     if self.day_open:
+        #         self.buy(self.day_open * 1.04, 1)
+        #         print(self.day_open)
         self.put_event()
 
     def on_stop(self):
@@ -69,6 +69,8 @@ class TickStrategy(CtaTemplate):
         """
         Callback of new tick data update.
         """
+        if self.pos == 0 and self.a == 0:
+            self.buy(tick.limit_up,1)
         if self.pos > 0 and self.a == 0:
             self.sell(tick.open_price + 2, abs(self.pos))
             self.a = 1
@@ -82,7 +84,7 @@ class TickStrategy(CtaTemplate):
         Callback of new bar data update.
         """
 
-        self.day_open = bar.close_price
+        #self.day_open = bar.close_price
         if bar.datetime.time() > self.exit_time:
             self.cancel_all()
             if self.pos > 0:
