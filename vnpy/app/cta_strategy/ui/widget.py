@@ -1,5 +1,3 @@
-from typing import Any
-
 from vnpy.event import Event, EventEngine
 from vnpy.trader.engine import MainEngine
 from vnpy.trader.ui import QtCore, QtGui, QtWidgets
@@ -58,6 +56,9 @@ class CtaManager(QtWidgets.QWidget):
         stop_button = QtWidgets.QPushButton("全部停止")
         stop_button.clicked.connect(self.cta_engine.stop_all_strategies)
 
+        clear_button = QtWidgets.QPushButton("清空日志")
+        clear_button.clicked.connect(self.clear_log)
+
         self.scroll_layout = QtWidgets.QVBoxLayout()
         self.scroll_layout.addStretch()
 
@@ -82,6 +83,7 @@ class CtaManager(QtWidgets.QWidget):
         hbox1.addWidget(init_button)
         hbox1.addWidget(start_button)
         hbox1.addWidget(stop_button)
+        hbox1.addWidget(clear_button)
 
         grid = QtWidgets.QGridLayout()
         grid.addWidget(scroll_area, 0, 0, 2, 1)
@@ -125,7 +127,7 @@ class CtaManager(QtWidgets.QWidget):
 
     def remove_strategy(self, strategy_name):
         """"""
-        manager = self.managers[strategy_name]
+        manager = self.managers.pop(strategy_name)
         manager.deleteLater()
 
     def add_strategy(self):
@@ -146,6 +148,10 @@ class CtaManager(QtWidgets.QWidget):
             self.cta_engine.add_strategy(
                 class_name, strategy_name, vt_symbol, setting
             )
+
+    def clear_log(self):
+        """"""
+        self.log_monitor.setRowCount(0)
 
     def show(self):
         """"""
@@ -173,24 +179,26 @@ class StrategyManager(QtWidgets.QFrame):
 
     def init_ui(self):
         """"""
-        self.setMaximumHeight(300)
+        self.setFixedHeight(300)
         self.setFrameShape(self.Box)
         self.setLineWidth(1)
 
-        init_button = QtWidgets.QPushButton("初始化")
-        init_button.clicked.connect(self.init_strategy)
+        self.init_button = QtWidgets.QPushButton("初始化")
+        self.init_button.clicked.connect(self.init_strategy)
 
-        start_button = QtWidgets.QPushButton("启动")
-        start_button.clicked.connect(self.start_strategy)
+        self.start_button = QtWidgets.QPushButton("启动")
+        self.start_button.clicked.connect(self.start_strategy)
+        self.start_button.setEnabled(False)
 
-        stop_button = QtWidgets.QPushButton("停止")
-        stop_button.clicked.connect(self.stop_strategy)
+        self.stop_button = QtWidgets.QPushButton("停止")
+        self.stop_button.clicked.connect(self.stop_strategy)
+        self.stop_button.setEnabled(False)
 
-        edit_button = QtWidgets.QPushButton("编辑")
-        edit_button.clicked.connect(self.edit_strategy)
+        self.edit_button = QtWidgets.QPushButton("编辑")
+        self.edit_button.clicked.connect(self.edit_strategy)
 
-        remove_button = QtWidgets.QPushButton("移除")
-        remove_button.clicked.connect(self.remove_strategy)
+        self.remove_button = QtWidgets.QPushButton("移除")
+        self.remove_button.clicked.connect(self.remove_strategy)
 
         strategy_name = self._data["strategy_name"]
         vt_symbol = self._data["vt_symbol"]
@@ -207,11 +215,11 @@ class StrategyManager(QtWidgets.QFrame):
         self.variables_monitor = DataMonitor(self._data["variables"])
 
         hbox = QtWidgets.QHBoxLayout()
-        hbox.addWidget(init_button)
-        hbox.addWidget(start_button)
-        hbox.addWidget(stop_button)
-        hbox.addWidget(edit_button)
-        hbox.addWidget(remove_button)
+        hbox.addWidget(self.init_button)
+        hbox.addWidget(self.start_button)
+        hbox.addWidget(self.stop_button)
+        hbox.addWidget(self.edit_button)
+        hbox.addWidget(self.remove_button)
 
         vbox = QtWidgets.QVBoxLayout()
         vbox.addWidget(label)
@@ -227,6 +235,26 @@ class StrategyManager(QtWidgets.QFrame):
         self.parameters_monitor.update_data(data["parameters"])
         self.variables_monitor.update_data(data["variables"])
 
+        # Update button status
+        variables = data["variables"]
+        inited = variables["inited"]
+        trading = variables["trading"]
+
+        if not inited:
+            return
+        self.init_button.setEnabled(False)
+
+        if trading:
+            self.start_button.setEnabled(False)
+            self.stop_button.setEnabled(True)
+            self.edit_button.setEnabled(False)
+            self.remove_button.setEnabled(False)
+        else:
+            self.start_button.setEnabled(True)
+            self.stop_button.setEnabled(False)
+            self.edit_button.setEnabled(True)
+            self.remove_button.setEnabled(True)
+
     def init_strategy(self):
         """"""
         self.cta_engine.init_strategy(self.strategy_name)
@@ -241,8 +269,6 @@ class StrategyManager(QtWidgets.QFrame):
 
     def edit_strategy(self):
         """"""
-        # vt_symbol = self._data["vt_symbol"]
-        # class_name = self._data["class_name"]
         strategy_name = self._data["strategy_name"]
 
         parameters = self.cta_engine.get_strategy_parameters(strategy_name)
@@ -255,8 +281,11 @@ class StrategyManager(QtWidgets.QFrame):
 
     def remove_strategy(self):
         """"""
-        self.cta_engine.remove_strategy(self.strategy_name)
-        self.cta_manager.remove_strategy(self.strategy_name)
+        result = self.cta_engine.remove_strategy(self.strategy_name)
+
+        # Only remove strategy gui manager if it has been removed from engine
+        if result:
+            self.cta_manager.remove_strategy(self.strategy_name)
 
 
 class DataMonitor(QtWidgets.QTableWidget):
@@ -302,23 +331,6 @@ class DataMonitor(QtWidgets.QTableWidget):
             cell.setText(str(value))
 
 
-class StrategyCell(BaseCell):
-    """
-    Cell used for showing strategy name.
-    """
-
-    def __init__(self, content: str, data: Any):
-        """"""
-        super(StrategyCell, self).__init__(content, data)
-
-    def set_content(self, content: Any, data: Any):
-        """
-        Set text using enum.constant.value.
-        """
-        if content:
-            super(StrategyCell, self).set_content(content.strategy_name, data)
-
-
 class StopOrderMonitor(BaseMonitor):
     """
     Monitor for local stop order.
@@ -334,24 +346,16 @@ class StopOrderMonitor(BaseMonitor):
             "cell": BaseCell,
             "update": False,
         },
-        "vt_orderid": {"display": "限价委托号", "cell": BaseCell, "update": True},
-        "vt_symbol": {"display": "代码", "cell": BaseCell, "update": False},
-        "order_type": {"display": "类型", "cell": EnumCell, "update": False},
+        "vt_orderids": {"display": "限价委托号", "cell": BaseCell, "update": True},
+        "vt_symbol": {"display": "本地代码", "cell": BaseCell, "update": False},
+        "direction": {"display": "方向", "cell": EnumCell, "update": False},
+        "offset": {"display": "开平", "cell": EnumCell, "update": False},
         "price": {"display": "价格", "cell": BaseCell, "update": False},
-        "volume": {"display": "数量", "cell": BaseCell, "update": True},
+        "volume": {"display": "数量", "cell": BaseCell, "update": False},
         "status": {"display": "状态", "cell": EnumCell, "update": True},
-        "strategy": {"display": "策略名", "cell": StrategyCell, "update": True},
+        "lock": {"display": "锁仓", "cell": BaseCell, "update": False},
+        "strategy_name": {"display": "策略名", "cell": BaseCell, "update": False},
     }
-
-    def init_ui(self):
-        """
-        Stretch columns.
-        """
-        super(StopOrderMonitor, self).init_ui()
-
-        self.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.Stretch
-        )
 
 
 class LogMonitor(BaseMonitor):
@@ -450,7 +454,16 @@ class SettingEditor(QtWidgets.QDialog):
 
         for name, tp in self.edits.items():
             edit, type_ = tp
-            value = type_(edit.text())
+            value_text = edit.text()
+
+            if type_ == bool:
+                if value_text == "True":
+                    value = True
+                else:
+                    value = False
+            else:
+                value = type_(value_text)
+
             setting[name] = value
 
         return setting

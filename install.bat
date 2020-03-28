@@ -1,5 +1,11 @@
+:: Upgrade pip & setuptools
+python -m pip install --upgrade pip setuptools
+
+::Install talib and ibapi
+python -m pip install https://pip.vnpy.com/colletion/TA_Lib-0.4.17-cp37-cp37m-win_amd64.whl
+
 ::Install Python Modules
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 :: Install vn.py
-python setup.py install
+python -m pip install .
