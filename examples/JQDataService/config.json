@@ -1,0 +1,9 @@
+{
+	"MONGO_HOST": "localhost",
+	"MONGO_PORT": 27017,
+
+	"JQ_IP": "18201003706",
+	"JQ_Password": "61582968",
+
+	"SYMBOLS": ["rb2005","m2005","AP005","cu2005","SR005","c2005"]
+}
